@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM Hub - Gerenciador de Projetos e Chats</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --bg-hover: #334155;
+    --border: #334155;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 30px; flex-wrap: wrap; gap: 15px;
+  }
+  h1 { font-size: 28px; }
+  h1 span { color: var(--accent); }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px; margin-bottom: 30px;
+  }
+  .stat-card {
+    background: var(--bg-card); padding: 20px; border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .stat-card .num { font-size: 32px; font-weight: bold; color: var(--accent); }
+  .stat-card .label { color: var(--text-dim); font-size: 14px; margin-top: 5px; }
+  .tabs {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border); padding-bottom: 10px;
+  }
+  .tab {
+    padding: 10px 20px; background: transparent; color: var(--text-dim);
+    border: none; cursor: pointer; border-radius: 6px; font-size: 14px;
+    transition: all 0.2s;
+  }
+  .tab:hover { background: var(--bg-hover); color: var(--text); }
+  .tab.active { background: var(--accent); color: white; }
+  .toolbar {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+    align-items: center;
+  }
+  input, select, textarea {
+    background: var(--bg-card); color: var(--text);
+    border: 1px solid var(--border); padding: 10px 14px;
+    border-radius: 6px; font-size: 14px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  input[type="text"], input[type="url"], input[type="date"] { min-width: 200px; }
+  textarea { width: 100%; min-height: 100px; resize: vertical; }
+  button {
+    background: var(--accent); color: white; border: none;
+    padding: 10px 18px; border-radius: 6px; cursor: pointer;
+    font-size: 14px; font-weight: 500; transition: all 0.2s;
+  }
+  button:hover { background: var(--accent-hover); }
+  button.secondary { background: var(--bg-hover); }
+  button.secondary:hover { background: var(--border); }
+  button.danger { background: var(--danger); }
+  button.success { background: var(--success); }
+  button.small { padding: 6px 12px; font-size: 12px; }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 15px;
+  }
+  .card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px; transition: all 0.2s;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 10px;
+  }
+  .card-title { font-size: 18px; font-weight: 600; }
+  .card-meta { color: var(--text-dim); font-size: 13px; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+  }
+  .badge.active { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+  .badge.paused { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+  .badge.done { background: rgba(59, 130, 246, 0.2); color: var(--accent); }
+  .badge.archived { background: rgba(148, 163, 184, 0.2); color: var(--text-dim); }
+  .llm-tag {
+    display: inline-block; padding: 4px 10px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; margin-right: 5px;
+    background: var(--bg-hover);
+  }
+  .card-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .stack { display: flex; flex-wrap: wrap; gap: 5px; }
+  .stack span {
+    background: var(--bg-hover); padding: 3px 8px; border-radius: 4px;
+    font-size: 11px; color: var(--text-dim);
+  }
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); z-index: 100;
+    justify-content: center; align-items: center; padding: 20px;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-card); border-radius: 12px; padding: 30px;
+    max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--border);
+  }
+  .modal h2 { margin-bottom: 20px; }
+  .form-group { margin-bottom: 15px; }
+  .form-group label {
+    display: block; margin-bottom: 6px; font-size: 13px;
+    color: var(--text-dim); font-weight: 500;
+  }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; }
+  .modal-actions {
+    display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;
+  }
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--text-dim);
+  }
+  .empty-state h3 { margin-bottom: 10px; color: var(--text); }
+  .toast {
+    position: fixed; bottom: 30px; right: 30px;
+    background: var(--success); color: white;
+    padding: 14px 22px; border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transform: translateY(100px); opacity: 0;
+    transition: all 0.3s; z-index: 200;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { background: var(--danger); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .context-preview {
+    background: var(--bg); padding: 12px; border-radius: 6px;
+    font-family: monospace; font-size: 12px; color: var(--text-dim);
+    max-height: 150px; overflow-y: auto; white-space: pre-wrap;
+    border: 1px solid var(--border);
+  }
+  @media (max-width: 600px) {
+    .toolbar { flex-direction: column; align-items: stretch; }
+    input, select { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🤖 LLM <span>Hub</span></h1>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="secondary small" onclick="exportData()">💾 Exportar Backup</button>
+      <button class="secondary small" onclick="document.getElementById('importFile').click()">📂 Importar Backup</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('projects', event)">📁 Projetos</button>
+    <button class="tab" onclick="switchTab('chats', event)">💬 Chats</button>
+    <button class="tab" onclick="switchTab('llms', event)">🤖 LLMs</button>
+  </div>
+
+  <!-- PROJETOS -->
+  <div id="tab-projects" class="tab-content">
+    <div class="toolbar">
+      <input type="text" id="searchProjects" placeholder="🔍 Buscar projeto..." oninput="renderProjects()">
+      <select id="filterProjectStatus" onchange="renderProjects()">
+        <option value="">Todos os status</option>
+        <option value="active">Ativo</option>
+        <option value="paused">Pausado</option>
+        <option value="done">Concluído</option>
+        <option value="archived">Arquivado</option>
+      </select>
+      <button onclick="openProjectModal()">+ Novo Projeto</button>
+    </div>
+    <div class="grid" id="projectsGrid"></div>
+  </div>
+
+  <!-- CHATS -->
+  <div id="tab-chats" class="tab-content" style="display:none">
+    <div class="toolbar">
+      <input type="text" id="searchChats" placeholder="🔍 Buscar chat..." oninput="renderChats()">
+      <select id="filterChatProject" onchange="renderChats()">
+        <option value="">Todos os projetos</option>
+      </select>
+      <select id="filterChatLLM" onchange="renderChats()">
+        <option value="">Todas as LLMs</option>
+      </select>
+      <button onclick="openChatModal()">+ Novo Chat</button>
+    </div>
+    <div class="grid" id="chatsGrid"></div>
+  </div>
+
+  <!-- LLMS -->
+  <div id="tab-llms" class="tab-content" style="display:none">
+    <div class="toolbar">
+      <button onclick="openLLMModal()">+ Nova LLM</button>
+    </div>
+    <div class="grid" id="llmsGrid"></div>
+  </div>
+</div>
+
+<!-- MODAIS -->
+<div class="modal-overlay" id="projectModal">
+  <div class="modal">
+    <h2 id="projectModalTitle">Novo Projeto</h2>
+    <input type="hidden" id="projectId">
+    <div class="form-group">
+      <label>Nome do Projeto *</label>
+      <input type="text" id="projectName" placeholder="Ex: Canaledu Multiemissora">
+    </div>
+    <div class="form-group">
+      <label>Descrição / Objetivo</label>
+      <textarea id="projectDescription" placeholder="Em 1-2 frases, qual o objetivo do projeto?"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Stack Tecnológica (separado por vírgula)</label>
+      <input type="text" id="projectStack" placeholder="HTML, JS Vanilla, Supabase">
+    </div>
+    <div class="form-group">
+      <label>Status Atual / Fase</label>
+      <input type="text" id="projectPhase" placeholder="Ex: Fase 2 - Cadastros Normalizados">
+    </div>
+    <div class="form-group">
+      <label>Concluído</label>
+      <textarea id="projectDone" placeholder="O que já foi feito?"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Pendente / Bloqueador</label>
+      <textarea id="projectPending" placeholder="O que está travado ou pendente?"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Regras de Interação</label>
+      <textarea id="projectRules" placeholder="Ex: Não reescreva arquivos inteiros, mantenha simplicidade..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="projectStatus">
+        <option value="active">Ativo</option>
+        <option value="paused">Pausado</option>
+        <option value="done">Concluído</option>
+        <option value="archived">Arquivado</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal('projectModal')">Cancelar</button>
+      <button onclick="saveProject()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="chatModal">
+  <div class="modal">
+    <h2 id="chatModalTitle">Novo Chat</h2>
+    <input type="hidden" id="chatId">
+    <div class="form-group">
+      <label>Título do Chat *</label>
+      <input type="text" id="chatTitle" placeholder="Ex: Erro Modal cadastros.js">
+    </div>
+    <div class="form-group">
+      <label>Projeto *</label>
+      <select id="chatProject"></select>
+    </div>
+    <div class="form-group">
+      <label>LLM *</label>
+      <select id="chatLLM"></select>
+    </div>
+    <div class="form-group">
+      <label>Link do Chat (opcional)</label>
+      <input type="url" id="chatUrl" placeholder="https://...">
+    </div>
+    <div class="form-group">
+      <label>Data</label>
+      <input type="date" id="chatDate">
+    </div>
+    <div class="form-group">
+      <label>Tópico / Papel da LLM</label>
+      <input type="text" id="chatTopic" placeholder="Ex: Revisor de código sênior">
+    </div>
+    <div class="form-group">
+      <label>Notas / Resumo</label>
+      <textarea id="chatNotes" placeholder="Decisões tomadas, códigos gerados, próximos passos..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="chatStatus">
+        <option value="active">Em andamento</option>
+        <option value="done">Resolvido</option>
+        <option value="archived">Arquivado</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal('chatModal')">Cancelar</button>
+      <button onclick="saveChat()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="llmModal">
+  <div class="modal">
+    <h2 id="llmModalTitle">Nova LLM</h2>
+    <input type="hidden" id="llmId">
+    <div class="form-group">
+      <label>Nome *</label>
+      <input type="text" id="llmName" placeholder="Ex: ChatGPT">
+    </div>
+    <div class="form-group">
+      <label>Papel / Especialidade</label>
+      <input type="text" id="llmRole" placeholder="Ex: Raciocínio lógico, arquitetura">
+    </div>
+    <div class="form-group">
+      <label>URL Base (opcional)</label>
+      <input type="url" id="llmUrl" placeholder="https://chat.openai.com">
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal('llmModal')">Cancelar</button>
+      <button onclick="saveLLM()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="contextModal">
+  <div class="modal" style="max-width: 700px;">
+    <h2>📋 Contexto Mestre</h2>
+    <p style="color:var(--text-dim); margin-bottom:15px; font-size:13px;">
+      Copie este texto e cole como <strong>primeira mensagem</strong> em qualquer nova conversa com a LLM.
+    </p>
+    <div class="context-preview" id="contextPreview"></div>
+    <div class="modal-actions">
+      <button class="secondary" onclick="closeModal('contextModal')">Fechar</button>
+      <button class="success" onclick="copyContext()">📋 Copiar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ ESTADO ============
+let state = {
+  projects: [],
+  chats: [],
+  llms: []
+};
+
+// ============ PERSISTÊNCIA ============
+function save() {
+  localStorage.setItem('llmHubData', JSON.stringify(state));
+}
+function load() {
+  const data = localStorage.getItem('llmHubData');
+  if (data) {
+    state = JSON.parse(data);
+  } else {
+    loadDefaults();
+  }
+}
+function loadDefaults() {
+  state.llms = [
+    { id: uid(), name: 'ChatGPT', role: 'Raciocínio lógico, arquitetura, brainstorming', url: 'https://chat.openai.com' },
+    { id: uid(), name: 'Claude', role: 'Análise de docs longos, revisão de código, contexto extenso', url: 'https://claude.ai' },
+    { id: uid(), name: 'Gemini', role: 'Pesquisa web, análise de dados, ecossistema Google', url: 'https://gemini.google.com' },
+    { id: uid(), name: 'Lovable', role: 'Prototipagem UI/UX, geração de front-end visual', url: 'https://lovable.dev' },
+    { id: uid(), name: 'Qwen', role: 'Codificação, testes alternativos, lógica complexa', url: 'https://chat.qwen.ai' },
+    { id: uid(), name: 'DeepSeek', role: 'Codificação, análise profunda, custo-benefício', url: 'https://chat.deepseek.com' }
+  ];
+  const canaleduId = uid();
+  state.projects = [
+    {
+      id: canaleduId,
+      name: 'Canaledu Multiemissora',
+      description: 'Plataforma de gestão e emissão de conteúdos educacionais multiemissora.',
+      stack: ['HTML', 'JS Vanilla', 'Supabase'],
+      phase: 'Fase 2 - Cadastros Normalizados',
+      done: 'Banco de dados atualizado no Supabase com novas tabelas e relacionamentos.',
+      pending: 'Erro de carregamento no script cadastros.js - ReferenceError nas funções de modal.',
+      rules: 'Não reescreva arquivos inteiros. Mantenha JS Vanilla simples. Considere estrutura relacional do Supabase.',
+      status: 'active'
+    }
+  ];
+  state.chats = [
+    {
+      id: uid(),
+      projectId: canaleduId,
+      llmId: state.llms[1].id,
+      title: 'Erro Modal cadastros.js',
+      url: '',
+      date: '2026-11-20',
+      topic: 'Revisor de código sênior - JS Vanilla',
+      notes: 'ReferenceError nas funções de modal. Prioridade para segunda-feira.',
+      status: 'active'
+    }
+  ];
+  save();
+}
+
+// ============ UTILS ============
+function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+function toast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 2500);
+}
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+function switchTab(name, e) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+  document.getElementById('tab-' + name).style.display = 'block';
+}
+
+// ============ PROJETOS ============
+function renderProjects() {
+  const grid = document.getElementById('projectsGrid');
+  const search = document.getElementById('searchProjects').value.toLowerCase();
+  const statusFilter = document.getElementById('filterProjectStatus').value;
+  let list = state.projects.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(search) || (p.description||'').toLowerCase().includes(search);
+    const matchStatus = !statusFilter || p.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+  if (list.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><h3>Nenhum projeto encontrado</h3><p>Crie seu primeiro projeto para começar.</p></div>';
+    return;
+  }
+  grid.innerHTML = list.map(p => {
+    const chatCount = state.chats.filter(c => c.projectId === p.id).length;
+    return `
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">${escapeHtml(p.name)}</div>
+            <span class="badge ${p.status}">${statusLabel(p.status)}</span>
+          </div>
+        </div>
+        <div class="card-meta">${escapeHtml(p.description || 'Sem descrição')}</div>
+        ${p.phase ? `<div class="card-meta"><strong>Fase:</strong> ${escapeHtml(p.phase)}</div>` : ''}
+        <div class="stack">${(p.stack||[]).map(s => `<span>${escapeHtml(s)}</span>`).join('')}</div>
+        ${p.pending ? `<div class="card-meta" style="color:var(--warning)">⚠️ ${escapeHtml(p.pending)}</div>` : ''}
+        <div class="card-meta">💬 ${chatCount} chat(s) vinculado(s)</div>
+        <div class="card-actions">
+          <button class="small success" onclick="showContext('${p.id}')">📋 Contexto Mestre</button>
+          <button class="small secondary" onclick="editProject('${p.id}')">✏️ Editar</button>
+          <button class="small danger" onclick="deleteProject('${p.id}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+function statusLabel(s) {
+  return { active: 'Ativo', paused: 'Pausado', done: 'Concluído', archived: 'Arquivado' }[s] || s;
+}
+function openProjectModal() {
+  document.getElementById('projectModalTitle').textContent = 'Novo Projeto';
+  ['projectId','projectName','projectDescription','projectStack','projectPhase','projectDone','projectPending','projectRules'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('projectStatus').value = 'active';
+  openModal('projectModal');
+}
+function editProject(id) {
+  const p = state.projects.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('projectModalTitle').textContent = 'Editar Projeto';
+  document.getElementById('projectId').value = p.id;
+  document.getElementById('projectName').value = p.name || '';
+  document.getElementById('projectDescription').value = p.description || '';
+  document.getElementById('projectStack').value = (p.stack||[]).join(', ');
+  document.getElementById('projectPhase').value = p.phase || '';
+  document.getElementById('projectDone').value = p.done || '';
+  document.getElementById('projectPending').value = p.pending || '';
+  document.getElementById('projectRules').value = p.rules || '';
+  document.getElementById('projectStatus').value = p.status || 'active';
+  openModal('projectModal');
+}
+function saveProject() {
+  const id = document.getElementById('projectId').value;
+  const name = document.getElementById('projectName').value.trim();
+  if (!name) { toast('Nome é obrigatório', true); return; }
+  const data = {
+    name,
+    description: document.getElementById('projectDescription').value.trim(),
+    stack: document.getElementById('projectStack').value.split(',').map(s => s.trim()).filter(Boolean),
+    phase: document.getElementById('projectPhase').value.trim(),
+    done: document.getElementById('projectDone').value.trim(),
+    pending: document.getElementById('projectPending').value.trim(),
+    rules: document.getElementById('projectRules').value.trim(),
+    status: document.getElementById('projectStatus').value
+  };
+  if (id) {
+    const idx = state.projects.findIndex(p => p.id === id);
+    state.projects[idx] = { ...state.projects[idx], ...data };
+  } else {
+    state.projects.push({ id: uid(), ...data });
+  }
+  save();
+  closeModal('projectModal');
+  renderAll();
+  toast('Projeto salvo!');
+}
+function deleteProject(id) {
+  if (!confirm('Excluir este projeto e todos os chats vinculados?')) return;
+  state.projects = state.projects.filter(p => p.id !== id);
+  state.chats = state.chats.filter(c => c.projectId !== id);
+  save();
+  renderAll();
+  toast('Projeto excluído');
+}
+
+// ============ CONTEXT MASTER ============
+function showContext(id) {
+  const p = state.projects.find(x => x.id === id);
+  if (!p) return;
+  const today = new Date().toLocaleDateString('pt-BR');
+  const md = `# CONTEXTO DO PROJETO: ${p.name}
+
+**📅 Data da última atualização:** ${today}
+**👤 Papel da LLM neste chat:** [PREENCHA AQUI]
+
+## 1. Visão Geral
+${p.description || '[Sem descrição]'}
+
+## 2. Stack Tecnológica (Rígido)
+${(p.stack||[]).map(s => `- ${s}`).join('\n') || '- Não definida'}
+
+## 3. Status Atual do Projeto
+- **Fase:** ${p.phase || 'Não definida'}
+- **Concluído:** ${p.done || 'Nada concluído ainda'}
+- **Pendente/Bloqueador:** ${p.pending || 'Nenhum'}
+
+## 4. Regras de Interação (Siga estritamente)
+${p.rules || '- Nenhuma regra específica'}
+
+## 5. Tarefa Deste Chat Específico
+[APAGUE ESTA LINHA E ESCREVA AQUI O QUE VOCÊ QUER AGORA]
+
+---
+**Trecho de código / Dúvida específica:**
+[COLE AQUI]`;
+  document.getElementById('contextPreview').textContent = md;
+  openModal('contextModal');
+}
+function copyContext() {
+  const text = document.getElementById('contextPreview').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('Contexto copiado!'));
+}
+
+// ============ CHATS ============
+function renderChats() {
+  const grid = document.getElementById('chatsGrid');
+  const search = document.getElementById('searchChats').value.toLowerCase();
+  const projectFilter = document.getElementById('filterChatProject').value;
+  const llmFilter = document.getElementById('filterChatLLM').value;
+  let list = state.chats.filter(c => {
+    const matchSearch = c.title.toLowerCase().includes(search) || (c.notes||'').toLowerCase().includes(search);
+    const matchProject = !projectFilter || c.projectId === projectFilter;
+    const matchLLM = !llmFilter || c.llmId === llmFilter;
+    return matchSearch && matchProject && matchLLM;
+  });
+  // Atualiza selects de filtro
+  const fp = document.getElementById('filterChatProject');
+  const currentFP = fp.value;
+  fp.innerHTML = '<option value="">Todos os projetos</option>' + state.projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  fp.value = currentFP;
+  const fl = document.getElementById('filterChatLLM');
+  const currentFL = fl.value;
+  fl.innerHTML = '<option value="">Todas as LLMs</option>' + state.llms.map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+  fl.value = currentFL;
+
+  if (list.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><h3>Nenhum chat encontrado</h3><p>Registre seus chats para manter o histórico organizado.</p></div>';
+    return;
+  }
+  grid.innerHTML = list.map(c => {
+    const p = state.projects.find(x => x.id === c.projectId);
+    const l = state.llms.find(x => x.id === c.llmId);
+    return `
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">${escapeHtml(c.title)}</div>
+            <span class="badge ${c.status === 'active' ? 'active' : c.status === 'done' ? 'done' : 'archived'}">
+              ${c.status === 'active' ? 'Em andamento' : c.status === 'done' ? 'Resolvido' : 'Arquivado'}
+            </span>
+          </div>
+        </div>
+        <div class="card-meta">📁 ${p ? escapeHtml(p.name) : '<em>Projeto removido</em>'}</div>
+        <div><span class="llm-tag">🤖 ${l ? escapeHtml(l.name) : 'LLM removida'}</span></div>
+        ${c.topic ? `<div class="card-meta">🎯 ${escapeHtml(c.topic)}</div>` : ''}
+        ${c.date ? `<div class="card-meta">📅 ${c.date}</div>` : ''}
+        ${c.notes ? `<div class="card-meta" style="font-style:italic">"${escapeHtml(c.notes.substring(0, 120))}${c.notes.length > 120 ? '...' : ''}"</div>` : ''}
+        <div class="card-actions">
+          ${c.url ? `<a href="${escapeHtml(c.url)}" target="_blank" class="small" style="display:inline-block;padding:6px 12px;background:var(--bg-hover);border-radius:6px;font-size:12px;">🔗 Abrir Chat</a>` : ''}
+          <button class="small secondary" onclick="editChat('${c.id}')">✏️ Editar</button>
+          <button class="small danger" onclick="deleteChat('${c.id}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+function openChatModal() {
+  if (state.projects.length === 0) { toast('Crie um projeto primeiro', true); return; }
+  if (state.llms.length === 0) { toast('Cadastre uma LLM primeiro', true); return; }
+  document.getElementById('chatModalTitle').textContent = 'Novo Chat';
+  ['chatId','chatTitle','chatUrl','chatTopic','chatNotes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('chatDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('chatStatus').value = 'active';
+  document.getElementById('chatProject').innerHTML = state.projects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+  document.getElementById('chatLLM').innerHTML = state.llms.map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('');
+  openModal('chatModal');
+}
+function editChat(id) {
+  const c = state.chats.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('chatModalTitle').textContent = 'Editar Chat';
+  document.getElementById('chatId').value = c.id;
+  document.getElementById('chatTitle').value = c.title || '';
+  document.getElementById('chatUrl').value = c.url || '';
+  document.getElementById('chatDate').value = c.date || '';
+  document.getElementById('chatTopic').value = c.topic || '';
+  document.getElementById('chatNotes').value = c.notes || '';
+  document.getElementById('chatStatus').value = c.status || 'active';
+  document.getElementById('chatProject').innerHTML = state.projects.map(p => `<option value="${p.id}" ${p.id===c.projectId?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+  document.getElementById('chatLLM').innerHTML = state.llms.map(l => `<option value="${l.id}" ${l.id===c.llmId?'selected':''}>${escapeHtml(l.name)}</option>`).join('');
+  openModal('chatModal');
+}
+function saveChat() {
+  const id = document.getElementById('chatId').value;
+  const title = document.getElementById('chatTitle').value.trim();
+  if (!title) { toast('Título é obrigatório', true); return; }
+  const data = {
+    title,
+    projectId: document.getElementById('chatProject').value,
+    llmId: document.getElementById('chatLLM').value,
+    url: document.getElementById('chatUrl').value.trim(),
+    date: document.getElementById('chatDate').value,
+    topic: document.getElementById('chatTopic').value.trim(),
+    notes: document.getElementById('chatNotes').value.trim(),
+    status: document.getElementById('chatStatus').value
+  };
+  if (id) {
+    const idx = state.chats.findIndex(c => c.id === id);
+    state.chats[idx] = { ...state.chats[idx], ...data };
+  } else {
+    state.chats.push({ id: uid(), ...data });
+  }
+  save();
+  closeModal('chatModal');
+  renderAll();
+  toast('Chat salvo!');
+}
+function deleteChat(id) {
+  if (!confirm('Excluir este chat?')) return;
+  state.chats = state.chats.filter(c => c.id !== id);
+  save();
+  renderAll();
+  toast('Chat excluído');
+}
+
+// ============ LLMS ============
+function renderLLMs() {
+  const grid = document.getElementById('llmsGrid');
+  if (state.llms.length === 0) {
+    grid.innerHTML = '<div class="empty-state"><h3>Nenhuma LLM cadastrada</h3></div>';
+    return;
+  }
+  grid.innerHTML = state.llms.map(l => {
+    const chatCount = state.chats.filter(c => c.llmId === l.id).length;
+    return `
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🤖 ${escapeHtml(l.name)}</div>
+        </div>
+        <div class="card-meta">${escapeHtml(l.role || 'Sem papel definido')}</div>
+        ${l.url ? `<div><a href="${escapeHtml(l.url)}" target="_blank">🔗 ${escapeHtml(l.url)}</a></div>` : ''}
+        <div class="card-meta">💬 ${chatCount} chat(s) usando esta LLM</div>
+        <div class="card-actions">
+          <button class="small secondary" onclick="editLLM('${l.id}')">✏️ Editar</button>
+          <button class="small danger" onclick="deleteLLM('${l.id}')">🗑️</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+function openLLMModal() {
+  document.getElementById('llmModalTitle').textContent = 'Nova LLM';
+  ['llmId','llmName','llmRole','llmUrl'].forEach(id => document.getElementById(id).value = '');
+  openModal('llmModal');
+}
+function editLLM(id) {
+  const l = state.llms.find(x => x.id === id);
+  if (!l) return;
+  document.getElementById('llmModalTitle').textContent = 'Editar LLM';
+  document.getElementById('llmId').value = l.id;
+  document.getElementById('llmName').value = l.name || '';
+  document.getElementById('llmRole').value = l.role || '';
+  document.getElementById('llmUrl').value = l.url || '';
+  openModal('llmModal');
+}
+function saveLLM() {
+  const id = document.getElementById('llmId').value;
+  const name = document.getElementById('llmName').value.trim();
+  if (!name) { toast('Nome é obrigatório', true); return; }
+  const data = {
+    name,
+    role: document.getElementById('llmRole').value.trim(),
+    url: document.getElementById('llmUrl').value.trim()
+  };
+  if (id) {
+    const idx = state.llms.findIndex(l => l.id === id);
+    state.llms[idx] = { ...state.llms[idx], ...data };
+  } else {
+    state.llms.push({ id: uid(), ...data });
+  }
+  save();
+  closeModal('llmModal');
+  renderAll();
+  toast('LLM salva!');
+}
+function deleteLLM(id) {
+  if (!confirm('Excluir esta LLM? Chats vinculados ficarão sem LLM.')) return;
+  state.llms = state.llms.filter(l => l.id !== id);
+  save();
+  renderAll();
+  toast('LLM excluída');
+}
+
+// ============ DASHBOARD ============
+function renderStats() {
+  const activeProjects = state.projects.filter(p => p.status === 'active').length;
+  const activeChats = state.chats.filter(c => c.status === 'active').length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="num">${state.projects.length}</div><div class="label">Projetos totais</div></div>
+    <div class="stat-card"><div class="num">${activeProjects}</div><div class="label">Projetos ativos</div></div>
+    <div class="stat-card"><div class="num">${state.chats.length}</div><div class="label">Chats registrados</div></div>
+    <div class="stat-card"><div class="num">${activeChats}</div><div class="label">Chats em andamento</div></div>
+    <div class="stat-card"><div class="num">${state.llms.length}</div><div class="label">LLMs cadastradas</div></div>
+  `;
+}
+
+// ============ EXPORT / IMPORT ============
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `llm-hub-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup exportado!');
+}
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.projects || !data.chats || !data.llms) throw new Error('Formato inválido');
+      if (!confirm('Isso substituirá todos os dados atuais. Continuar?')) return;
+      state = data;
+      save();
+      renderAll();
+      toast('Backup importado!');
+    } catch (err) {
+      toast('Erro ao importar: ' + err.message, true);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ============ HELPERS ============
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function renderAll() {
+  renderStats();
+  renderProjects();
+  renderChats();
+  renderLLMs();
+}
+
+// ============ INIT ============
+load();
+renderAll();
+</script>
+</body>
+</html>
